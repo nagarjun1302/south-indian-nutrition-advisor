@@ -357,9 +357,21 @@ Stay healthy! <br>
     <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 650px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
         <!-- Header Banner -->
         <tr>
-            <td style="background: linear-gradient(135deg, #15803d 0%, #166534 100%); padding: 28px 24px; text-align: center;">
-                <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">🌿 South Indian Nutrition Advisor</h1>
-                <p style="color: #dcfce7; margin: 6px 0 0 0; font-size: 14px;">Personalized Meal Analysis & Health Insights</p>
+            <td style="background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%); padding: 28px 24px; text-align: center;">
+                <table align="center" border="0" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="padding-right: 8px; vertical-align: middle;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+                                <path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/>
+                            </svg>
+                        </td>
+                        <td style="vertical-align: middle;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">NutriWise South</h1>
+                        </td>
+                    </tr>
+                </table>
+                <p style="color: #ffe4d1; margin: 6px 0 0 0; font-size: 14px;">Personalized South Indian Nutrition Advisor</p>
             </td>
         </tr>
         <!-- Content Card -->
