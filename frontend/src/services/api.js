@@ -1,4 +1,4 @@
-let API_BASE_URL = localStorage.getItem('nutrisense_api_url') || 'http://localhost:8000';
+let API_BASE_URL = import.meta.env.VITE_API_URL || localStorage.getItem('nutrisense_api_url') || 'http://localhost:8000';
 
 export function getApiBaseUrl() {
   return API_BASE_URL;
