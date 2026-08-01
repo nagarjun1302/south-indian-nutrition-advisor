@@ -21,44 +21,32 @@ class MessagingService:
         self.smtp_email = os.getenv("SMTP_EMAIL")  # Your email address
         self.smtp_password = os.getenv("SMTP_PASSWORD")  # Your app password
         
-        # SendGrid Settings (alternative)
+        # API Keys for HTTP-based email services (bypasses Render SMTP port blocking)
+        self.resend_api_key = os.getenv("RESEND_API_KEY")
         self.sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
-        self.from_email = os.getenv("FROM_EMAIL", self.smtp_email or "nutrition@yourapp.com")
         
-        # Initialize
-        if self.email_method == "sendgrid" and self.sendgrid_api_key:
-            try:
-                from sendgrid import SendGridAPIClient
-                self.sendgrid_client = SendGridAPIClient(self.sendgrid_api_key)
-                print("Email initialized (SendGrid)")
-            except ImportError:
-                print("SendGrid not installed. Install with: pip install sendgrid")
-                self.sendgrid_client = None
+        if self.resend_api_key:
+            print("Email initialized (Resend HTTP API)")
+        elif self.sendgrid_api_key:
+            print("Email initialized (SendGrid HTTP API)")
         elif self.smtp_email and self.smtp_password:
-            self.sendgrid_client = None
             print(f"Email initialized (SMTP - {self.email_method})")
         else:
-            self.sendgrid_client = None
             print("Email credentials not configured - messages will be printed to console")
     
     def send_email(self, to: str, subject: str, body: str, is_html: bool = True) -> bool:
         """
-        Send email via SMTP or SendGrid
-        
-        Args:
-            to: Email address
-            subject: Email subject
-            body: Email body (HTML or plain text)
-            is_html: Whether body is HTML
-        
-        Returns:
-            True if successful
+        Send email via Resend API, SendGrid API, or SMTP
         """
-        # Try SendGrid first if configured
-        if self.sendgrid_client:
-            return self._send_via_sendgrid(to, subject, body)
+        # 1. Try Resend HTTP API (Port 443 - Recommended for Render)
+        if self.resend_api_key:
+            return self._send_via_resend(to, subject, body)
+
+        # 2. Try SendGrid HTTP API (Port 443 - Recommended for Render)
+        if self.sendgrid_api_key:
+            return self._send_via_sendgrid_http(to, subject, body)
         
-        # Try SMTP (Gmail/Outlook)
+        # 3. Fallback to SMTP
         if self.smtp_email and self.smtp_password:
             return self._send_via_smtp(to, subject, body, is_html)
         
@@ -69,6 +57,68 @@ class MessagingService:
         print(f"Body:\n{body}")
         print("-" * 60)
         return False
+
+    def _send_via_resend(self, to: str, subject: str, body: str) -> bool:
+        """Send email via Resend HTTP API (Port 443 - Never blocked by Render)"""
+        try:
+            import requests
+            html_body = self._convert_to_html(body)
+            from_email = os.getenv("FROM_EMAIL", "NutriWise South <onboarding@resend.dev>")
+            
+            res = requests.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {self.resend_api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "from": from_email,
+                    "to": [to],
+                    "subject": subject,
+                    "html": html_body
+                },
+                timeout=12
+            )
+            if res.status_code in [200, 201, 202]:
+                print(f" Email sent successfully to {to} (via Resend HTTP API)")
+                return True
+            else:
+                print(f" Error sending via Resend API ({res.status_code}): {res.text}")
+                return False
+        except Exception as e:
+            print(f" Exception sending via Resend API: {e}")
+            return False
+
+    def _send_via_sendgrid_http(self, to: str, subject: str, body: str) -> bool:
+        """Send email via SendGrid HTTP API (Port 443 - Never blocked by Render)"""
+        try:
+            import requests
+            html_body = self._convert_to_html(body)
+            from_email = os.getenv("FROM_EMAIL", self.smtp_email or "nutrition@yourapp.com")
+            
+            res = requests.post(
+                "https://api.sendgrid.com/v3/mail/send",
+                headers={
+                    "Authorization": f"Bearer {self.sendgrid_api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "personalizations": [{"to": [{"email": to}]}],
+                    "from": {"email": from_email, "name": "NutriWise South"},
+                    "subject": subject,
+                    "content": [{"type": "text/html", "value": html_body}]
+                },
+                timeout=12
+            )
+            if res.status_code in [200, 201, 202]:
+                print(f" Email sent successfully to {to} (via SendGrid HTTP API)")
+                return True
+            else:
+                print(f" Error sending via SendGrid API ({res.status_code}): {res.text}")
+                return False
+        except Exception as e:
+            print(f" Exception sending via SendGrid API: {e}")
+            return False
     
     def _send_via_smtp(self, to: str, subject: str, body: str, is_html: bool) -> bool:
         """Send email via Gmail or Outlook SMTP"""
