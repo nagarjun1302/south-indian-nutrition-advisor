@@ -15,3 +15,14 @@ const SUPABASE_URL = RAW_SUPABASE_URL
   : '';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY);
+
+export async function signInWithGoogle() {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin,
+    },
+  });
+  if (error) throw error;
+  return data;
+}

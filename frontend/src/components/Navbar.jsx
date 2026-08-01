@@ -21,7 +21,7 @@ export const Navbar = ({
       case 'profile':
         return 'My Health Profile';
       default:
-        return 'NutriSense';
+        return 'NutriWise South';
     }
   };
 

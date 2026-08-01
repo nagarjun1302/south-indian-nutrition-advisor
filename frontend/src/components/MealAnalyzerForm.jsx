@@ -6,9 +6,9 @@ import {
   Sparkles,
   User,
   Heart,
+  HeartPulse,
   Mail,
   ChevronRight,
-  Zap,
 } from 'lucide-react';
 import { DISH_PRESETS, HEALTH_GOALS_LIST } from '../data/presets';
 import { analyzeMeal, generateMockAnalysis } from '../services/api';
@@ -128,7 +128,7 @@ export const MealAnalyzerForm = ({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <div className="badge badge-orange" style={{ marginBottom: '6px' }}>
-              <Zap size={12} /> MEAL EVALUATION
+              <HeartPulse size={12} /> MEAL EVALUATION
             </div>
             <h2 style={{ fontSize: '24px', fontWeight: '800' }}>Log & Evaluate Your Meal</h2>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>

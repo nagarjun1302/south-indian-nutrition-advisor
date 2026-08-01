@@ -266,36 +266,118 @@ Stay healthy! <br>
         return self.send_email(patient_email, subject, body, is_html=True)
     
     def _convert_to_html(self, text: str) -> str:
-        """Convert text to nice HTML email"""
-        
-        # If already contains HTML tags, wrap it nicely
-        if '<' in text and '>' in text:
-            html_content = text
-        else:
-            # Convert plain text to HTML
-            html_content = text.replace('\n\n', '</p><p>').replace('\n', '<br>')
-            html_content = f'<p>{html_content}</p>'
-        
-        # Wrap in full HTML email template
-        html = f"""
-<!DOCTYPE html>
+        """Convert markdown text to a beautifully styled HTML email report"""
+        import re
+
+        # Clean stringified dict if it was somehow passed
+        if text.startswith("{'type':") or text.startswith('{"type":'):
+            try:
+                import ast
+                parsed_dict = ast.literal_eval(text)
+                if isinstance(parsed_dict, dict) and 'text' in parsed_dict:
+                    text = parsed_dict['text']
+            except Exception:
+                pass
+
+        lines = text.split('\n')
+        html_lines = []
+        in_list = False
+
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                if in_list:
+                    html_lines.append("</ul>")
+                    in_list = False
+                continue
+
+            # Convert horizontal rule
+            if stripped == '---':
+                if in_list:
+                    html_lines.append("</ul>")
+                    in_list = False
+                html_lines.append('<hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">')
+                continue
+
+            # Convert headers
+            if stripped.startswith('### '):
+                if in_list:
+                    html_lines.append("</ul>")
+                    in_list = False
+                header_text = stripped[4:]
+                html_lines.append(f'<h3 style="color: #1e293b; font-size: 18px; margin-top: 20px; margin-bottom: 8px; font-weight: 600;">{header_text}</h3>')
+                continue
+            elif stripped.startswith('## '):
+                if in_list:
+                    html_lines.append("</ul>")
+                    in_list = False
+                header_text = stripped[3:]
+                html_lines.append(f'<h2 style="color: #166534; font-size: 20px; border-bottom: 2px solid #bbf7d0; padding-bottom: 6px; margin-top: 24px; margin-bottom: 12px; font-weight: 700;">{header_text}</h2>')
+                continue
+
+            # Convert bullet items
+            if stripped.startswith('* ') or stripped.startswith('- '):
+                if not in_list:
+                    html_lines.append('<ul style="margin: 8px 0; padding-left: 20px;">')
+                    in_list = True
+                item_text = stripped[2:]
+                item_text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', item_text)
+                html_lines.append(f'<li style="margin-bottom: 6px; color: #334155;">{item_text}</li>')
+                continue
+            elif re.match(r'^\d+\.\s', stripped):
+                if in_list:
+                    html_lines.append("</ul>")
+                    in_list = False
+                item_text = re.sub(r'^\d+\.\s*', '', stripped)
+                item_text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', item_text)
+                html_lines.append(f'<p style="margin-bottom: 8px; color: #334155; padding-left: 10px; border-left: 3px solid #22c55e;">{item_text}</p>')
+                continue
+
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
+
+            # Convert inline bold and paragraph
+            line_text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', stripped)
+            html_lines.append(f'<p style="margin-bottom: 12px; color: #334155; line-height: 1.6;">{line_text}</p>')
+
+        if in_list:
+            html_lines.append("</ul>")
+
+        body_html = '\n'.join(html_lines)
+
+        html = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nutrition Report</title>
+    <title>South Indian Nutrition Analysis</title>
 </head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div style="background-color: #f8f9fa; border-left: 4px solid #4CAF50; padding: 15px; margin-bottom: 20px;">
-        {html_content}
-    </div>
-    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #777; font-size: 0.9em;">
-        <p>This is an automated message from your Nutrition Advisor</p>
-        <p>For questions, please consult your healthcare provider</p>
-    </div>
+<body style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; color: #1e293b;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 650px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+        <!-- Header Banner -->
+        <tr>
+            <td style="background: linear-gradient(135deg, #15803d 0%, #166534 100%); padding: 28px 24px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">🌿 South Indian Nutrition Advisor</h1>
+                <p style="color: #dcfce7; margin: 6px 0 0 0; font-size: 14px;">Personalized Meal Analysis & Health Insights</p>
+            </td>
+        </tr>
+        <!-- Content Card -->
+        <tr>
+            <td style="padding: 30px 24px;">
+                {body_html}
+            </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+            <td style="background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b;">
+                <p style="margin: 0 0 4px 0;"><strong>South Indian Nutrition Advisor AI</strong></p>
+                <p style="margin: 0;">This automated report is designed to assist your daily nutrition management. Please consult your physician or registered dietitian for medical advice.</p>
+            </td>
+        </tr>
+    </table>
 </body>
-</html>
-"""
+</html>"""
         return html
 
 

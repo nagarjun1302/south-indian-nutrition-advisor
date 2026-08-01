@@ -6,6 +6,27 @@ from langchain_core.messages import HumanMessage
 import json
 import re
 
+def parse_json_from_llm(content: str) -> dict:
+    """Clean markdown codeblocks and parse JSON safely"""
+    cleaned = re.sub(r'```(?:json)?', '', content)
+    cleaned = cleaned.strip('`').strip()
+    
+    json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+    if not json_match:
+        raise ValueError("No JSON block found in response")
+    
+    json_str = json_match.group()
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        # Fix trailing commas
+        fixed_str = re.sub(r',\s*([\}\]])', r'\1', json_str)
+        try:
+            return json.loads(fixed_str)
+        except json.JSONDecodeError:
+            import ast
+            return ast.literal_eval(json_str)
+
 class IngredientAnalyzer:
     """Analyzes food ingredients using Gemini"""
     
@@ -13,13 +34,23 @@ class IngredientAnalyzer:
         self.llm = llm
     
     def _extract_content(self, response):
-        """Extract content from Gemini response"""
+        """Extract clean text content from Gemini / LangChain response"""
         if hasattr(response, 'content'):
             content = response.content
-            # Gemini returns list of content parts
+            if isinstance(content, str):
+                return content
             if isinstance(content, list):
-                # Join all text parts
-                return ' '.join(str(part.text) if hasattr(part, 'text') else str(part) for part in content)
+                parts = []
+                for part in content:
+                    if isinstance(part, str):
+                        parts.append(part)
+                    elif isinstance(part, dict):
+                        parts.append(part.get('text', str(part)))
+                    elif hasattr(part, 'text'):
+                        parts.append(getattr(part, 'text'))
+                    else:
+                        parts.append(str(part))
+                return '\n'.join(parts)
             return str(content)
         return str(response)
     
@@ -113,12 +144,7 @@ Return ONLY the JSON, no additional text.
             # Extract content properly
             content = self._extract_content(response)
             
-            # Try to find JSON in the response
-            json_match = re.search(r'\{.*\}', content, re.DOTALL)
-            if json_match:
-                analysis = json.loads(json_match.group())
-            else:
-                raise ValueError("No JSON found in response")
+            analysis = parse_json_from_llm(content)
             
             # Validate required fields
             required_fields = ['ingredients', 'nutrition', 'cooking_method']
@@ -180,9 +206,7 @@ Return ONLY the JSON.
             response = self.llm.invoke([HumanMessage(content=prompt)])
             content = self._extract_content(response)
             
-            json_match = re.search(r'\{.*\}', content, re.DOTALL)
-            if json_match:
-                return json.loads(json_match.group())
+            return parse_json_from_llm(content)
         except Exception as e:
             print(f"Error getting alternatives: {e}")
         

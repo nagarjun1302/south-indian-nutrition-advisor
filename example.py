@@ -5,7 +5,7 @@ Simple example with Email messaging
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 if not os.getenv("GOOGLE_API_KEY"):
     print("Set GOOGLE_API_KEY in .env file")

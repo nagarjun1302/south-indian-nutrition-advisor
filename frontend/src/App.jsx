@@ -11,6 +11,13 @@ import { AuthModal } from './components/AuthModal';
 import { SettingsModal } from './components/SettingsModal';
 import { checkBackendHealth } from './services/api';
 import { supabase } from './supabaseClient';
+import {
+  fetchUserProfile,
+  upsertUserProfile,
+  fetchMealLogs,
+  createMealLog,
+  clearAllMealLogs,
+} from './services/supabaseService';
 
 export function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -63,6 +70,36 @@ export function App() {
     }
   });
 
+  // Load user data from Supabase when logged in
+  const loadUserDataFromSupabase = async (userId, userEmail, userName) => {
+    if (!userId) return;
+
+    // Fetch profile
+    const remoteProfile = await fetchUserProfile(userId);
+    if (remoteProfile) {
+      setUserProfile(remoteProfile);
+    } else {
+      // First time login - save initial profile to Supabase
+      const initialProfile = {
+        name: userName || '',
+        email: userEmail || '',
+        age: userProfile.age || '34',
+        gender: userProfile.gender || 'male',
+        targetWeight: userProfile.targetWeight || '70',
+        dietPref: userProfile.dietPref || 'Vegetarian (Pure Veg)',
+        healthGoals: userProfile.healthGoals || ['Type 2 Diabetes Control'],
+      };
+      await upsertUserProfile(userId, initialProfile);
+      setUserProfile(initialProfile);
+    }
+
+    // Fetch meal logs
+    const remoteLogs = await fetchMealLogs(userId);
+    if (remoteLogs && remoteLogs.length > 0) {
+      setHistory(remoteLogs);
+    }
+  };
+
   // ─── SUPABASE SESSION CHECK & AUTH LISTENER ─────────────────────────────
   useEffect(() => {
     // 1) Fetch current session via supabase.auth.getSession()
@@ -75,11 +112,7 @@ export function App() {
           name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
         };
         setUser(u);
-        setUserProfile((prev) => ({
-          ...prev,
-          name: u.name,
-          email: u.email,
-        }));
+        loadUserDataFromSupabase(u.id, u.email, u.name);
       } else {
         setUser(null);
       }
@@ -96,11 +129,7 @@ export function App() {
           name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
         };
         setUser(u);
-        setUserProfile((prev) => ({
-          ...prev,
-          name: u.name,
-          email: u.email,
-        }));
+        loadUserDataFromSupabase(u.id, u.email, u.name);
       } else {
         setUser(null);
       }
@@ -139,7 +168,7 @@ export function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleAnalysisComplete = (result, requestData) => {
+  const handleAnalysisComplete = async (result, requestData) => {
     setCurrentResult(result);
     setCurrentRequest(requestData);
 
@@ -153,6 +182,14 @@ export function App() {
 
     setHistory((prev) => [historyItem, ...prev]);
     setActiveTab('results');
+
+    // Save to Supabase if logged in
+    if (user?.id) {
+      const savedRecord = await createMealLog(user.id, historyItem);
+      if (savedRecord?.id) {
+        historyItem.id = savedRecord.id;
+      }
+    }
   };
 
   const handleSelectHistoryItem = (item) => {
@@ -167,9 +204,19 @@ export function App() {
     setActiveTab('results');
   };
 
-  const handleClearHistory = () => {
+  const handleClearHistory = async () => {
     if (window.confirm('Are you sure you want to clear all your meal history?')) {
       setHistory([]);
+      if (user?.id) {
+        await clearAllMealLogs(user.id);
+      }
+    }
+  };
+
+  const handleSaveProfile = async (updated) => {
+    setUserProfile(updated);
+    if (user?.id) {
+      await upsertUserProfile(user.id, updated);
     }
   };
 
@@ -275,7 +322,7 @@ export function App() {
           {activeTab === 'profile' && (
             <UserProfileModal
               userProfile={userProfile}
-              onSaveProfile={(updated) => setUserProfile(updated)}
+              onSaveProfile={handleSaveProfile}
             />
           )}
         </main>

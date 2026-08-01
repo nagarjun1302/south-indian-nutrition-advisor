@@ -5,7 +5,7 @@
 *.env
 claude-openrouter.ps1
 
-# Python
+# Python Virtual Envs & Cache
 __pycache__/
 *.py[cod]
 *$py.class
@@ -20,23 +20,26 @@ venv.bak/
 .pytest_cache/
 *.log
 
-# Node & Frontend
+# Node & Build Artifacts
 node_modules/
 frontend/node_modules/
+dist/
 frontend/dist/
 frontend/dist-ssr/
 .npm
 *.log*
 
-# Operating System & IDE
+# OS & Editor Files
 .DS_Store
 Thumbs.db
+.vscode/
 .idea/
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
 *.swp
 *.swo
+*.suo
 
-# Temporary / Scratch files
+# Test & Scratch Scripts
+test_gemini_key.py
+test_api_key.py
 rough_notes.py
+scratch/

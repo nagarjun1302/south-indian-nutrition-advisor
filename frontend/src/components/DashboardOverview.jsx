@@ -1,16 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Utensils,
   Sparkles,
   Heart,
+  HeartPulse,
   History,
   BookOpen,
   ArrowRight,
   Flame,
   TrendingUp,
   Activity,
-  Zap,
 } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 export const DashboardOverview = ({
   onStartAnalysis,
@@ -19,8 +20,77 @@ export const DashboardOverview = ({
   userProfile,
   user,
 }) => {
+  const [mealsLoggedCount, setMealsLoggedCount] = useState(history ? history.length : 0);
+  const [streakDays, setStreakDays] = useState(0);
+
+  const fetchUserMetrics = async () => {
+    try {
+      // 1. Fetch current authenticated user using supabase.auth.getUser()
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUser = authData?.user;
+
+      if (!currentUser) {
+        setMealsLoggedCount(history ? history.length : 0);
+        setStreakDays(0);
+        return;
+      }
+
+      // 2. Count the number of notes/records in "meal_logs" table where user_id = current user id
+      const { data: logs, count, error } = await supabase
+        .from('meal_logs')
+        .select('created_at', { count: 'exact' })
+        .eq('user_id', currentUser.id);
+
+      if (!error) {
+        setMealsLoggedCount(count ?? (history ? history.length : 0));
+
+        // 3. Calculate current consecutive streak from actual meal log dates
+        if (logs && logs.length > 0) {
+          const uniqueDates = Array.from(
+            new Set(
+              logs.map((item) => {
+                const d = item.created_at ? new Date(item.created_at) : new Date();
+                return d.toISOString().split('T')[0];
+              })
+            )
+          ).sort().reverse();
+
+          const todayStr = new Date().toISOString().split('T')[0];
+          const yesterdayDate = new Date();
+          yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+          const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+
+          if (uniqueDates.includes(todayStr) || uniqueDates.includes(yesterdayStr)) {
+            let streak = 0;
+            let checkDate = uniqueDates.includes(todayStr) ? new Date() : yesterdayDate;
+
+            while (true) {
+              const checkStr = checkDate.toISOString().split('T')[0];
+              if (uniqueDates.includes(checkStr)) {
+                streak++;
+                checkDate.setDate(checkDate.getDate() - 1);
+              } else {
+                break;
+              }
+            }
+            setStreakDays(streak);
+          } else {
+            setStreakDays(0);
+          }
+        } else {
+          setStreakDays(0);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard stats from Supabase:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserMetrics();
+  }, [history, user]);
+
   const recentAnalyses = history.slice(0, 3);
-  const totalMealsLogged = history.length;
 
   const dailyCalorieGoal = 2000;
   const loggedCaloriesToday = history.reduce((sum, item) => sum + (item.nutritional_breakdown?.calories || 0), 0);
@@ -47,7 +117,7 @@ export const DashboardOverview = ({
             <Sparkles size={12} /> PERSONAL NUTRITION COMPANION
           </div>
           <h2 style={{ fontSize: '28px', fontWeight: '800', lineHeight: 1.2, marginBottom: '10px', color: 'var(--text-main)' }}>
-            {user && displayName ? `Welcome back, ${displayName}! 👋` : 'Welcome to NutriSense! 🥗'}
+            {user && displayName ? `Welcome back, ${displayName}! 👋` : 'Welcome to NutriWise South! 🥗'}
           </h2>
           <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '24px' }}>
             Track your daily meals, analyze nutritional balance, and discover healthy millet & legume alternatives tailored to your lifestyle goals.
@@ -73,7 +143,7 @@ export const DashboardOverview = ({
             pointerEvents: 'none',
           }}
         >
-          <Zap size={220} color="var(--accent-orange)" />
+          <HeartPulse size={220} color="var(--accent-orange)" strokeWidth={1.5} />
         </div>
       </div>
 
@@ -108,7 +178,7 @@ export const DashboardOverview = ({
             </div>
           </div>
           <div style={{ fontSize: '26px', fontWeight: '800', color: 'var(--text-main)' }}>
-            {totalMealsLogged} <span style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: '500' }}>meals</span>
+            {mealsLoggedCount} <span style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: '500' }}>meals</span>
           </div>
           <div style={{ fontSize: '12px', color: 'var(--accent-green)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <TrendingUp size={14} /> Active Tracking
@@ -144,7 +214,7 @@ export const DashboardOverview = ({
             </div>
           </div>
           <div style={{ fontSize: '26px', fontWeight: '800', color: 'var(--accent-purple)' }}>
-            🔥 {user ? '5 Days' : '0 Days'}
+            🔥 {streakDays} {streakDays === 1 ? 'Day' : 'Days'}
           </div>
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>
             Log daily to build long-term habits

@@ -6,7 +6,7 @@ import {
   BookOpen,
   User,
   Sparkles,
-  Zap,
+  HeartPulse,
   Crown,
   LogOut,
   LogIn,
@@ -43,11 +43,11 @@ export const Sidebar = ({
               boxShadow: '0 4px 14px rgba(249,115,22,0.3)',
             }}
           >
-            <Zap size={22} color="#ffffff" />
+            <HeartPulse size={22} color="#ffffff" strokeWidth={2.2} />
           </div>
           <div>
             <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
-              NutriSense
+              NutriWise South
             </div>
             <div style={{ fontSize: '11px', color: 'var(--accent-orange)', fontWeight: '700', letterSpacing: '0.5px' }}>
               SOUTH INDIAN AI NUTRITION
@@ -119,7 +119,7 @@ export const Sidebar = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '800', color: 'var(--accent-orange)', marginBottom: '4px' }}>
-            <Crown size={15} /> NutriSense Pro
+            <Crown size={15} /> NutriWise South Pro
           </div>
           <p style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.4, marginBottom: '10px' }}>
             Get unlimited AI meal evaluations & personalized meal plans.

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Lock, Mail, User, Sparkles, CheckCircle2 } from 'lucide-react';
-import { supabase } from '../supabaseClient';
+import { supabase, signInWithGoogle } from '../supabaseClient';
 
 export const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -18,7 +18,6 @@ export const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     setErrorMsg('');
     setInfoMsg('');
     setLoading(true);
-
     try {
       if (isSignUp) {
         const signedUpEmail = email.trim();
@@ -69,13 +68,7 @@ export const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     setInfoMsg('');
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin,
-        },
-      });
-      if (error) throw error;
+      await signInWithGoogle();
     } catch (err) {
       console.error('Google Auth error:', err);
       setErrorMsg(err.message || 'Google sign in failed. Please try again.');

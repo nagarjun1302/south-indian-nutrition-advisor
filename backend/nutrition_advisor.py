@@ -16,7 +16,7 @@ import re
 from dotenv import load_dotenv
 
 
-load_dotenv()
+load_dotenv(override=True)
 
 # Define the state structure
 class NutritionState(TypedDict):
@@ -37,21 +37,52 @@ class NutritionState(TypedDict):
     patient_whatsapp: Optional[str]
 
 def extract_content(response):
-    """Extract content from Gemini response"""
+    """Extract clean text content from Gemini / LangChain response"""
     if hasattr(response, 'content'):
         content = response.content
-        # Gemini returns list of content parts
+        if isinstance(content, str):
+            return content
         if isinstance(content, list):
-            # Join all text parts
-            return ' '.join(str(part.text) if hasattr(part, 'text') else str(part) for part in content)
+            parts = []
+            for part in content:
+                if isinstance(part, str):
+                    parts.append(part)
+                elif isinstance(part, dict):
+                    parts.append(part.get('text', str(part)))
+                elif hasattr(part, 'text'):
+                    parts.append(getattr(part, 'text'))
+                else:
+                    parts.append(str(part))
+            return '\n'.join(parts)
         return str(content)
     return str(response)
+
+def parse_json_from_llm(content: str) -> dict:
+    """Clean markdown codeblocks and parse JSON safely"""
+    cleaned = re.sub(r'```(?:json)?', '', content)
+    cleaned = cleaned.strip('`').strip()
     
-# Initialize Gemini LLM
+    json_match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+    if not json_match:
+        raise ValueError("No JSON block found in response")
+    
+    json_str = json_match.group()
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        fixed_str = re.sub(r',\s*([\}\]])', r'\1', json_str)
+        try:
+            return json.loads(fixed_str)
+        except json.JSONDecodeError:
+            import ast
+            return ast.literal_eval(json_str)
+
+# Initialize Gemini LLM (reads GEMINI_MODEL from .env, defaults to gemini-flash-latest)
+gemini_model = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",  # or gemini-1.5-pro
+    model=gemini_model,
     temperature=0,
-    google_api_key=os.getenv("GOOGLE_API_KEY")  # Use environment variable
+    google_api_key=os.getenv("GOOGLE_API_KEY")
 )
 
 ingredient_analyzer = IngredientAnalyzer(llm)
@@ -169,12 +200,7 @@ Return ONLY valid JSON, no additional text or markdown.
         # Extract content properly
         content = extract_content(response)
         
-        # Extract JSON from response
-        json_match = re.search(r'\{.*\}', content, re.DOTALL)
-        if json_match:
-            recommendations = json.loads(json_match.group())
-        else:
-            raise ValueError("No JSON found")
+        recommendations = parse_json_from_llm(content)
             
     except Exception as e:
         print(f"⚠️ Error parsing recommendations: {e}")
