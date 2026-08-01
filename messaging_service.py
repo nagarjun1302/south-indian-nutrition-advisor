@@ -76,13 +76,16 @@ class MessagingService:
             # SMTP server configuration
             if self.email_method == "gmail":
                 smtp_server = "smtp.gmail.com"
-                smtp_port = 587
+                smtp_port = 465
+                use_ssl = True
             elif self.email_method == "outlook":
                 smtp_server = "smtp-mail.outlook.com"
                 smtp_port = 587
+                use_ssl = False
             else:
                 smtp_server = "smtp.gmail.com"
-                smtp_port = 587
+                smtp_port = 465
+                use_ssl = True
             
             # Create message
             msg = MIMEMultipart('alternative')
@@ -97,11 +100,16 @@ class MessagingService:
             else:
                 msg.attach(MIMEText(body, 'plain'))
             
-            # Send email
-            with smtplib.SMTP(smtp_server, smtp_port) as server:
-                server.starttls()
-                server.login(self.smtp_email, self.smtp_password)
-                server.send_message(msg)
+            # Send email via SSL (Port 465) or TLS (Port 587)
+            if use_ssl or smtp_port == 465:
+                with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
+                    server.login(self.smtp_email, self.smtp_password)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(smtp_server, smtp_port) as server:
+                    server.starttls()
+                    server.login(self.smtp_email, self.smtp_password)
+                    server.send_message(msg)
             
             print(f" Email sent successfully to {to} (via {self.email_method})")
             return True
