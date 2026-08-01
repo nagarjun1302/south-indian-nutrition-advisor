@@ -139,7 +139,18 @@ Return ONLY the JSON, no additional text.
 """
 
         try:
-            response = self.llm.invoke([HumanMessage(content=prompt)])
+            # Retry loop for Gemini 429 Rate Limits
+            response = None
+            for attempt in range(3):
+                try:
+                    response = self.llm.invoke([HumanMessage(content=prompt)])
+                    break
+                except Exception as err:
+                    if ("429" in str(err) or "RESOURCE_EXHAUSTED" in str(err)) and attempt < 2:
+                        import time
+                        time.sleep(2 * (attempt + 1))
+                    else:
+                        raise err
             
             # Extract content properly
             content = self._extract_content(response)

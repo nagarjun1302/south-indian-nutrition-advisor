@@ -195,7 +195,17 @@ Return ONLY valid JSON, no additional text or markdown.
 """
 
     try:
-        response = llm.invoke([HumanMessage(content=recommendations_prompt)])
+        response = None
+        for attempt in range(3):
+            try:
+                response = llm.invoke([HumanMessage(content=recommendations_prompt)])
+                break
+            except Exception as err:
+                if ("429" in str(err) or "RESOURCE_EXHAUSTED" in str(err)) and attempt < 2:
+                    import time
+                    time.sleep(2 * (attempt + 1))
+                else:
+                    raise err
         
         # Extract content properly
         content = extract_content(response)
@@ -304,7 +314,18 @@ Return plain text report, no JSON.
 """
 
     try:
-        response = llm.invoke([HumanMessage(content=report_prompt)])
+        response = None
+        for attempt in range(3):
+            try:
+                response = llm.invoke([HumanMessage(content=report_prompt)])
+                break
+            except Exception as err:
+                if ("429" in str(err) or "RESOURCE_EXHAUSTED" in str(err)) and attempt < 2:
+                    import time
+                    time.sleep(2 * (attempt + 1))
+                else:
+                    raise err
+
         # Extract content properly
         final_report = extract_content(response)
     except Exception as e:

@@ -21,11 +21,21 @@ class MessagingService:
         self.smtp_email = os.getenv("SMTP_EMAIL")  # Your email address
         self.smtp_password = os.getenv("SMTP_PASSWORD")  # Your app password
         
+        # Gmail REST API Settings (bypasses Render SMTP port blocking)
+        self.gmail_client_id = os.getenv("GMAIL_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID")
+        self.gmail_client_secret = os.getenv("GMAIL_CLIENT_SECRET") or os.getenv("GOOGLE_CLIENT_SECRET")
+        self.gmail_refresh_token = os.getenv("GMAIL_REFRESH_TOKEN") or os.getenv("GOOGLE_REFRESH_TOKEN")
+        
         # API Keys for HTTP-based email services (bypasses Render SMTP port blocking)
+        self.brevo_api_key = os.getenv("BREVO_API_KEY")
         self.resend_api_key = os.getenv("RESEND_API_KEY")
         self.sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
         
-        if self.resend_api_key:
+        if self.gmail_client_id and self.gmail_client_secret and self.gmail_refresh_token:
+            print("Email initialized (Gmail REST API - Port 443)")
+        elif self.brevo_api_key:
+            print("Email initialized (Brevo HTTP API)")
+        elif self.resend_api_key:
             print("Email initialized (Resend HTTP API)")
         elif self.sendgrid_api_key:
             print("Email initialized (SendGrid HTTP API)")
@@ -36,17 +46,25 @@ class MessagingService:
     
     def send_email(self, to: str, subject: str, body: str, is_html: bool = True) -> bool:
         """
-        Send email via Resend API, SendGrid API, or SMTP
+        Send email via Gmail REST API, Brevo API, Resend API, SendGrid API, or SMTP
         """
-        # 1. Try Resend HTTP API (Port 443 - Recommended for Render)
+        # 1. Try official Gmail REST API (Port 443 - Recommended for Render)
+        if self.gmail_client_id and self.gmail_client_secret and self.gmail_refresh_token:
+            return self._send_via_gmail_api(to, subject, body, is_html)
+
+        # 2. Try Brevo HTTP API (Port 443)
+        if self.brevo_api_key:
+            return self._send_via_brevo(to, subject, body)
+
+        # 3. Try Resend HTTP API (Port 443)
         if self.resend_api_key:
             return self._send_via_resend(to, subject, body)
 
-        # 2. Try SendGrid HTTP API (Port 443 - Recommended for Render)
+        # 4. Try SendGrid HTTP API (Port 443)
         if self.sendgrid_api_key:
             return self._send_via_sendgrid_http(to, subject, body)
         
-        # 3. Fallback to SMTP
+        # 5. Fallback to SMTP
         if self.smtp_email and self.smtp_password:
             return self._send_via_smtp(to, subject, body, is_html)
         
@@ -57,6 +75,99 @@ class MessagingService:
         print(f"Body:\n{body}")
         print("-" * 60)
         return False
+
+    def _send_via_gmail_api(self, to: str, subject: str, body: str, is_html: bool) -> bool:
+        """Send email via official Gmail REST API over HTTPS (Port 443 - Never blocked by Render)"""
+        try:
+            import requests
+            import base64
+            
+            # Fetch fresh access token using refresh token
+            token_res = requests.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "client_id": self.gmail_client_id,
+                    "client_secret": self.gmail_client_secret,
+                    "refresh_token": self.gmail_refresh_token,
+                    "grant_type": "refresh_token"
+                },
+                timeout=10
+            )
+
+            if token_res.status_code != 200:
+                print(f" Error fetching Gmail OAuth access token ({token_res.status_code}): {token_res.text}")
+                return False
+
+            access_token = token_res.json().get("access_token")
+
+            # Create MIME Message
+            msg = MIMEMultipart('alternative')
+            msg['From'] = self.smtp_email or "me"
+            msg['To'] = to
+            msg['Subject'] = subject
+
+            if is_html:
+                html_body = self._convert_to_html(body)
+                msg.attach(MIMEText(html_body, 'html'))
+            else:
+                msg.attach(MIMEText(body, 'plain'))
+
+            # Base64url encode the message for Gmail REST API
+            raw_b64 = base64.urlsafe_b64encode(msg.as_bytes()).decode('utf-8')
+
+            # Post to Gmail REST API endpoint over HTTPS (Port 443)
+            api_res = requests.post(
+                "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json"
+                },
+                json={"raw": raw_b64},
+                timeout=12
+            )
+
+            if api_res.status_code in [200, 201, 202]:
+                print(f" Email sent successfully to {to} (via Gmail REST API)")
+                return True
+            else:
+                print(f" Error sending via Gmail REST API ({api_res.status_code}): {api_res.text}")
+                return False
+
+        except Exception as e:
+            print(f" Exception sending via Gmail REST API: {e}")
+            return False
+
+    def _send_via_brevo(self, to: str, subject: str, body: str) -> bool:
+        """Send email via Brevo HTTP API (Port 443 - Send to ANY email address for free)"""
+        try:
+            import requests
+            html_body = self._convert_to_html(body)
+            sender_email = os.getenv("FROM_EMAIL", self.smtp_email or "nagarjun1302@gmail.com")
+            
+            res = requests.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={
+                    "api-key": self.brevo_api_key,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                json={
+                    "sender": {"name": "NutriWise South", "email": sender_email},
+                    "to": [{"email": to}],
+                    "subject": subject,
+                    "htmlContent": html_body
+                },
+                timeout=12
+            )
+            if res.status_code in [200, 201, 202]:
+                print(f" Email sent successfully to {to} (via Brevo HTTP API)")
+                return True
+            else:
+                print(f" Error sending via Brevo API ({res.status_code}): {res.text}")
+                return False
+        except Exception as e:
+            print(f" Exception sending via Brevo API: {e}")
+            return False
 
     def _send_via_resend(self, to: str, subject: str, body: str) -> bool:
         """Send email via Resend HTTP API (Port 443 - Never blocked by Render)"""
